@@ -9,17 +9,19 @@ import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
 import com.chess.databinding.ActivityMainBinding
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
-import okhttp3.ResponseBody
 import okio.Buffer
-import okio.BufferedSource
+import org.json.JSONObject
 import retrofit2.HttpException
 import java.util.concurrent.TimeUnit
 
@@ -39,6 +41,8 @@ class MainActivity : AppCompatActivity() {
     private var boardState: Array<Array<Char?>> = Array(8) { Array(8) { null } }
     private var currentTurn: Char = 'w'
     private var playerColor: Char = 'w'
+
+    private val updateFlow = MutableSharedFlow<Array<Array<Char?>>>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -95,6 +99,12 @@ class MainActivity : AppCompatActivity() {
         binding.startButton.setOnClickListener {
             startGameAgainstBot()
         }
+
+        lifecycleScope.launch {
+            updateFlow.collect { boardState ->
+                updateChessBoard(boardState)
+            }
+        }
     }
 
     private fun startGameAgainstBot() {
@@ -114,7 +124,7 @@ class MainActivity : AppCompatActivity() {
                     boardState = newBoardState
                     currentTurn = turn
                     playerColor = if (response.player == "white") 'w' else 'b'
-                    updateChessBoard(response.fen)
+                    updateChessBoard(newBoardState)
                     playerColorTextView.text = if (response.player == "white") "Белые" else "Черные"
 
                     // Start streaming game state updates
@@ -164,7 +174,36 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun handleGameStateUpdate(message: String) {
-        Log.d("MainActivity", "Handling game state update: $message")
+        Log.d("MainActivity", "Game state update: $message")
+        if (message.isNotEmpty()) {
+            try {
+                val jsonObject = JSONObject(message)
+                if (jsonObject.getString("type") == "gameState") {
+                    val moves = jsonObject.getString("moves").split(" ") // Получаем список ходов
+                    val lastMove =
+                        moves.lastOrNull() ?: return // Получаем последний ход, если он есть
+
+                    val (startCol, startRow, endCol, endRow) = parseMove(lastMove)
+
+                    // Проверяем состояние начальной клетки
+                    if (boardState[startRow][startCol] != null) {
+                        // Выполняем ход
+                        boardState[endRow][endCol] = boardState[startRow][startCol]
+                        boardState[startRow][startCol] = null
+
+                        // Обновляем текущий ход
+                        currentTurn = if (currentTurn == 'w') 'b' else 'w'
+
+                        // Обновляем доску через Flow
+                        CoroutineScope(Dispatchers.Main).launch {
+                            updateFlow.emit(boardState)
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("MainActivity", "Ошибка обработки gameState: ${e.message}")
+            }
+        }
     }
 
     private fun makeMove(move: String) {
@@ -192,11 +231,8 @@ class MainActivity : AppCompatActivity() {
                                 boardState[startRow][startCol] = null
                                 currentTurn = if (currentTurn == 'w') 'b' else 'w'
 
-                                updateChessBoard(fenFromBoardState(boardState, currentTurn))
-
-                                turnTextView.text =
-                                    "Ход: ${if (currentTurn == 'w') "Белые" else "Черные"}"
-
+                                // Обновляем доску через Flow
+                                updateFlow.emit(boardState)
                             }
                         } else {
                             Toast.makeText(
@@ -229,8 +265,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun updateChessBoard(fen: String) {
-        val (boardState, turn) = parseFen(fen)
+    private fun updateChessBoard(boardState: Array<Array<Char?>>) {
         chessBoardGrid.removeAllViews()
         val displayMetrics = resources.displayMetrics
         val cellSize = displayMetrics.widthPixels / 8
@@ -278,7 +313,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        turnTextView.text = "Ход: ${if (turn == 'w') "Белые" else "Черные"}"
+        turnTextView.text = "Ход: ${if (currentTurn == 'w') "Белые" else "Черные"}"
     }
 
     private fun parseFen(fen: String): Pair<Array<Array<Char?>>, Char> {
@@ -336,30 +371,5 @@ class MainActivity : AppCompatActivity() {
         val endCol = move[2] - 'a'
         val endRow = 8 - move[3].toString().toInt()
         return MoveData(startCol, startRow, endCol, endRow)
-    }
-
-    private fun fenFromBoardState(boardState: Array<Array<Char?>>, turn: Char): String {
-        var fen = ""
-        for (row in boardState) {
-            var emptyCount = 0
-            for (cell in row) {
-                if (cell == null) {
-                    emptyCount++
-                } else {
-                    if (emptyCount > 0) {
-                        fen += emptyCount
-                        emptyCount = 0
-                    }
-                    fen += cell
-                }
-            }
-            if (emptyCount > 0) {
-                fen += emptyCount
-            }
-            fen += "/"
-        }
-        fen = fen.dropLast(1)
-        fen += " $turn - - 0 1"
-        return fen
     }
 }
