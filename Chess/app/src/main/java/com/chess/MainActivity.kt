@@ -250,7 +250,7 @@ class MainActivity : AppCompatActivity() {
         val endMessage = when (status) {
             "mate" -> "Мат! Игра завершена."
             "resign" -> "Соперник сдался. Победа!"
-            "stalemate" -> "Пат. Ничья."
+            "stalemate" -> "Победа, ему некуда бежать."
             "draw" -> "Игра завершена вничью."
             "timeOut" -> "Время истекло. Победа!"
             "aborted" -> "Игра была прервана."
@@ -297,7 +297,9 @@ class MainActivity : AppCompatActivity() {
                         }
                     }
                 } catch (e: Exception) {
-                    Log.e("MainActivity", "Неизвестная ошибка: ${e.message}")
+                    Toast.makeText(
+                        this@MainActivity, "Ход невозможен", Toast.LENGTH_SHORT
+                    ).show()
                 }
             }
         }
