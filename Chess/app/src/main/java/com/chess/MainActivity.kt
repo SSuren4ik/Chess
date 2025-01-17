@@ -73,26 +73,57 @@ class MainActivity : AppCompatActivity() {
                     cellFrame.addView(imageView)
 
                     imageView.setOnClickListener {
-                        if (currentTurn == playerColor && (piece.isUpperCase() == (playerColor == 'w'))) {
-                            selectedPiece = Pair(row, col)
+                        // Если текущий ход игрока
+                        if (currentTurn == playerColor) {
+                            if (piece.isUpperCase() == (playerColor == 'w')) {
+                                // Выбор своей фигуры
+                                selectedPiece = Pair(row, col)
+                            } else {
+                                // Передаём управление обработчику FrameLayout для обработки съедания фигуры
+                                cellFrame.performClick()
+                            }
                         }
                     }
                 }
 
                 cellFrame.setOnClickListener {
-                    selectedPiece?.let { (startRow, startCol) ->
-                        if (boardState[row][col] == null || boardState[row][col]?.isUpperCase() != (playerColor == 'w')) {
+                    val targetPiece = boardState[row][col]
+
+                    if (selectedPiece != null) {
+                        val (startRow, startCol) = selectedPiece!!
+
+                        // Проверяем, принадлежит ли цель противнику
+                        val isAttack =
+                            targetPiece != null && targetPiece.isUpperCase() != (playerColor == 'w')
+
+                        if (targetPiece == null || isAttack) {
+                            // Выполняем ход
                             makeMove(
-                                "${getChessNotation(startCol)}${8 - startRow}${
-                                    getChessNotation(
-                                        col
-                                    )
-                                }${8 - row}"
+                                "${getChessNotation(startCol)}${8 - startRow}${getChessNotation(col)}${8 - row}"
                             )
                             selectedPiece = null
+                        } else {
+                            // Нельзя выполнить ход на выбранную клетку
+                            Toast.makeText(
+                                this@MainActivity,
+                                "Невозможно выполнить ход на выбранную клетку",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    } else {
+                        // Если фигура не выбрана
+                        if (targetPiece == null || targetPiece.isUpperCase() != (playerColor == 'w')) {
+                            // Чужая фигура или пустая клетка
+                            Toast.makeText(
+                                this@MainActivity, "Это не ваша фигура!", Toast.LENGTH_SHORT
+                            ).show()
+                        } else {
+                            // Выбираем фигуру
+                            selectedPiece = Pair(row, col)
                         }
                     }
                 }
+
             }
         }
 
@@ -112,7 +143,9 @@ class MainActivity : AppCompatActivity() {
             try {
                 val response = withContext(Dispatchers.IO) {
                     val instance = LichessApiService.RetrofitInstance.create()
-                    instance.startGameAgainstBot("Bearer $authToken", StartGameRequest(level = 1))
+                    instance.startGameAgainstBot(
+                        "Bearer $authToken", StartGameRequest(level = 1)
+                    )
                 }
 
                 currentGameId = response.id
@@ -129,25 +162,25 @@ class MainActivity : AppCompatActivity() {
 
                     streamBotGameState(currentGameId)
 
-                    withContext(Dispatchers.IO) {
-                        delay(2000)
+                    // Проверяем цвет игрока через 3 секунды
+                    lifecycleScope.launch {
+                        delay(3000)
+                        if (currentTurn != 'w') {
+                            // Если текущий ход — не белые, бот уже сделал ход
+                            opponentFirst = true
+                            playerColor = 'b'
+                            playerColorTextView.text = "Ваш цвет: Черные"
+                        } else {
+                            // Иначе игрок играет за белых
+                            opponentFirst = false
+                            playerColor = 'w'
+                            playerColorTextView.text = "Ваш цвет: Белые"
+                        }
                     }
-
-                    if (opponentFirst) {
-                        Log.d("MainActivity", "Player is black")
-                        playerColor = 'b' // Бот сделал ход, значит игрок за черных
-                        playerColorTextView.text = "Ваш цвет: Черные"
-                    } else {
-                        Log.d("MainActivity", "Player is black")
-                        playerColor = 'w' // Бот ждет хода, значит игрок за белых
-                        playerColorTextView.text = "Ваш цвет: Белые"
-                    }
-
                 }
                 Toast.makeText(this@MainActivity, "Игра началась", Toast.LENGTH_SHORT).show()
 
             } catch (e: HttpException) {
-                // Обработка ошибки при старте игры
                 Log.d("MainActivity", "Error starting game: ${e.response()?.errorBody()?.string()}")
                 Toast.makeText(this@MainActivity, "Ошибка при старте игры", Toast.LENGTH_SHORT).show()
             }
@@ -155,10 +188,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun streamBotGameState(gameId: String) {
-        val request = Request.Builder()
-            .url("https://lichess.org/api/bot/game/stream/$gameId")
-            .addHeader("Authorization", "Bearer $authToken")
-            .build()
+        val request = Request.Builder().url("https://lichess.org/api/bot/game/stream/$gameId")
+            .addHeader("Authorization", "Bearer $authToken").build()
 
         client.newCall(request).enqueue(object : okhttp3.Callback {
             override fun onFailure(call: okhttp3.Call, e: java.io.IOException) {
@@ -285,32 +316,57 @@ class MainActivity : AppCompatActivity() {
                     cellFrame.addView(imageView)
 
                     imageView.setOnClickListener {
-                        if (currentTurn == playerColor && (piece.isUpperCase() == (playerColor == 'w'))) {
-                            selectedPiece = Pair(row, col)
+                        // Если текущий ход игрока
+                        if (currentTurn == playerColor) {
+                            if (piece.isUpperCase() == (playerColor == 'w')) {
+                                // Выбор своей фигуры
+                                selectedPiece = Pair(row, col)
+                            } else {
+                                // Передаём управление обработчику FrameLayout для обработки съедания фигуры
+                                cellFrame.performClick()
+                            }
                         }
                     }
                 }
 
                 cellFrame.setOnClickListener {
-                    selectedPiece?.let { (startRow, startCol) ->
-                        // Проверяем, пуста ли  или принадлежит ли фигура противнику
-                        val targetPiece = boardState[row][col]
-                        val isAttack = targetPiece != null && targetPiece.isUpperCase() != (playerColor == 'w')
+                    val targetPiece = boardState[row][col]
+
+                    if (selectedPiece != null) {
+                        val (startRow, startCol) = selectedPiece!!
+
+                        // Проверяем, принадлежит ли цель противнику
+                        val isAttack =
+                            targetPiece != null && targetPiece.isUpperCase() != (playerColor == 'w')
 
                         if (targetPiece == null || isAttack) {
+                            // Выполняем ход
                             makeMove(
                                 "${getChessNotation(startCol)}${8 - startRow}${getChessNotation(col)}${8 - row}"
                             )
                             selectedPiece = null
                         } else {
+                            // Нельзя выполнить ход на выбранную клетку
                             Toast.makeText(
                                 this@MainActivity,
                                 "Невозможно выполнить ход на выбранную клетку",
                                 Toast.LENGTH_SHORT
                             ).show()
                         }
+                    } else {
+                        // Если фигура не выбрана
+                        if (targetPiece == null || targetPiece.isUpperCase() != (playerColor == 'w')) {
+                            // Чужая фигура или пустая клетка
+                            Toast.makeText(
+                                this@MainActivity, "Это не ваша фигура!", Toast.LENGTH_SHORT
+                            ).show()
+                        } else {
+                            // Выбираем фигуру
+                            selectedPiece = Pair(row, col)
+                        }
                     }
                 }
+
             }
         }
 
