@@ -213,6 +213,13 @@ class MainActivity : AppCompatActivity() {
                         opponentFirst = true
                     }
 
+                    val status = jsonObject.optString("status", "")
+
+                    if (status.isNotEmpty() && status != "started") {
+                        handleGameEnd(status)
+                        return
+                    }
+
                     val (startCol, startRow, endCol, endRow) = parseMove(lastMove)
 
                     if (boardState[startRow][startCol] != null) {
@@ -230,6 +237,25 @@ class MainActivity : AppCompatActivity() {
                 Log.e("MainActivity", "Ошибка обработки gameState: ${e.message}")
             }
         }
+    }
+
+    private fun handleGameEnd(status: String) {
+        val endMessage = when (status) {
+            "mate" -> "Мат! Игра завершена."
+            "resign" -> "Соперник сдался. Победа!"
+            "stalemate" -> "Пат. Ничья."
+            "draw" -> "Игра завершена вничью."
+            "timeOut" -> "Время истекло. Победа!"
+            "aborted" -> "Игра была прервана."
+            else -> "Игра завершена."
+        }
+
+        CoroutineScope(Dispatchers.Main).launch {
+            Toast.makeText(this@MainActivity, endMessage, Toast.LENGTH_LONG).show()
+            turnTextView.text = "Игра завершена"
+        }
+
+        Log.d("MainActivity", "Game ended with status: $status")
     }
 
     private fun makeMove(move: String) {
