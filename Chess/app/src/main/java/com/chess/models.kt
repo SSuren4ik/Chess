@@ -12,22 +12,20 @@ data class LichessGameResponse(
     val source: String,
     val status: Status,
     val createdAt: Long,
-    val player: String
+    val player: String,
 )
 
 data class Variant(
     val key: String,
     val name: String,
-    val short: String
+    val short: String,
 )
 
 data class Status(
     val id: Int,
-    val name: String
+    val name: String,
 )
 
 data class LichessMoveResponse(val ok: Boolean)
 
 data class MoveData(val startCol: Int, val startRow: Int, val endCol: Int, val endRow: Int)
-
-data class LichessBotMoveResponse(val move: String?)

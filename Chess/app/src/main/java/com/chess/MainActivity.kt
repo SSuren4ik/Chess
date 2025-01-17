@@ -13,8 +13,8 @@ import androidx.lifecycle.lifecycleScope
 import com.chess.databinding.ActivityMainBinding
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -33,14 +33,14 @@ class MainActivity : AppCompatActivity() {
     private val chessBoardGrid: GridLayout by lazy { findViewById(R.id.chessBoardGrid) }
     private val turnTextView: TextView by lazy { findViewById(R.id.turnTextView) }
     private val playerColorTextView: TextView by lazy { findViewById(R.id.playerColor) }
-    private val client = OkHttpClient.Builder()
-        .readTimeout(0, TimeUnit.MILLISECONDS) // Устанавливаем бесконечное ожидание данных
-        .build()
+    private val client = OkHttpClient.Builder().readTimeout(0, TimeUnit.MILLISECONDS).build()
 
-    private var selectedPiece: Pair<Int, Int>? = null // Хранит координаты выбранной фигуры
+    private var selectedPiece: Pair<Int, Int>? = null
     private var boardState: Array<Array<Char?>> = Array(8) { Array(8) { null } }
     private var currentTurn: Char = 'w'
     private var playerColor: Char = 'w'
+    private var opponentFirst = false
+    private var myFirstMove = false
 
     private val updateFlow = MutableSharedFlow<Array<Array<Char?>>>()
 
@@ -81,7 +81,7 @@ class MainActivity : AppCompatActivity() {
 
                 cellFrame.setOnClickListener {
                     selectedPiece?.let { (startRow, startCol) ->
-                        if (boardState[row][col] == null && boardState[startRow][startCol]?.isUpperCase() == (playerColor == 'w')) {
+                        if (boardState[row][col] == null || boardState[row][col]?.isUpperCase() != (playerColor == 'w')) {
                             makeMove(
                                 "${getChessNotation(startCol)}${8 - startRow}${
                                     getChessNotation(
@@ -123,20 +123,33 @@ class MainActivity : AppCompatActivity() {
                     val (newBoardState, turn) = parseFen(response.fen)
                     boardState = newBoardState
                     currentTurn = turn
-                    playerColor = if (response.player == "white") 'w' else 'b'
                     updateChessBoard(newBoardState)
-                    playerColorTextView.text = if (response.player == "white") "Белые" else "Черные"
 
-                    // Start streaming game state updates
+                    playerColorTextView.text = "Определение вашего цвета..."
+
                     streamBotGameState(currentGameId)
+
+                    withContext(Dispatchers.IO) {
+                        delay(2000)
+                    }
+
+                    if (opponentFirst) {
+                        Log.d("MainActivity", "Player is black")
+                        playerColor = 'b' // Бот сделал ход, значит игрок за черных
+                        playerColorTextView.text = "Ваш цвет: Черные"
+                    } else {
+                        Log.d("MainActivity", "Player is black")
+                        playerColor = 'w' // Бот ждет хода, значит игрок за белых
+                        playerColorTextView.text = "Ваш цвет: Белые"
+                    }
+
                 }
                 Toast.makeText(this@MainActivity, "Игра началась", Toast.LENGTH_SHORT).show()
 
             } catch (e: HttpException) {
                 // Обработка ошибки при старте игры
                 Log.d("MainActivity", "Error starting game: ${e.response()?.errorBody()?.string()}")
-                Toast.makeText(this@MainActivity, "Ошибка при старте игры", Toast.LENGTH_SHORT)
-                    .show()
+                Toast.makeText(this@MainActivity, "Ошибка при старте игры", Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -174,14 +187,15 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun handleGameStateUpdate(message: String) {
-        Log.d("MainActivity", "Game state update: $message")
         if (message.isNotEmpty()) {
             try {
                 val jsonObject = JSONObject(message)
                 if (jsonObject.getString("type") == "gameState") {
                     val moves = jsonObject.getString("moves").split(" ") // Получаем список ходов
-                    val lastMove =
-                        moves.lastOrNull() ?: return // Получаем последний ход, если он есть
+                    val lastMove = moves.lastOrNull() ?: return
+                    if (myFirstMove) {
+                        opponentFirst = true
+                    }
 
                     val (startCol, startRow, endCol, endRow) = parseMove(lastMove)
 
@@ -215,20 +229,19 @@ class MainActivity : AppCompatActivity() {
                     val response = instance.makeMove(
                         "Bearer $authToken", gameId, move
                     )
+                    myFirstMove = true
                     Log.d("MainActivity", "Move response: $response")
 
                     withContext(Dispatchers.Main) {
                         if (response.ok) {
                             val (startCol, startRow, endCol, endRow) = parseMove(move)
-                            if (boardState[startRow][startCol] == null) {
-                                Toast.makeText(
-                                    this@MainActivity,
-                                    "Нет фигуры на выбранной клетке",
-                                    Toast.LENGTH_SHORT
-                                ).show()
-                            } else {
-                                boardState[endRow][endCol] = boardState[startRow][startCol]
+                            val movingPiece = boardState[startRow][startCol]
+
+                            if (movingPiece != null) {
+                                // Обновляем состояние доски
+                                boardState[endRow][endCol] = movingPiece
                                 boardState[startRow][startCol] = null
+
                                 currentTurn = if (currentTurn == 'w') 'b' else 'w'
 
                                 // Обновляем доску через Flow
@@ -236,30 +249,12 @@ class MainActivity : AppCompatActivity() {
                             }
                         } else {
                             Toast.makeText(
-                                this@MainActivity,
-                                "Ошибка при выполнении хода",
-                                Toast.LENGTH_SHORT
+                                this@MainActivity, "Ошибка при выполнении хода", Toast.LENGTH_SHORT
                             ).show()
                         }
                     }
-                } catch (e: HttpException) {
-                    Log.e(
-                        "MainActivity",
-                        "Ошибка при выполнении хода: ${e.response()?.errorBody()?.string()}"
-                    )
-                    withContext(Dispatchers.Main) {
-                        Toast.makeText(
-                            this@MainActivity,
-                            "Ошибка при выполнении хода",
-                            Toast.LENGTH_SHORT
-                        ).show()
-                    }
                 } catch (e: Exception) {
                     Log.e("MainActivity", "Неизвестная ошибка: ${e.message}")
-                    withContext(Dispatchers.Main) {
-                        Toast.makeText(this@MainActivity, "Неизвестная ошибка", Toast.LENGTH_SHORT)
-                            .show()
-                    }
                 }
             }
         }
@@ -298,15 +293,21 @@ class MainActivity : AppCompatActivity() {
 
                 cellFrame.setOnClickListener {
                     selectedPiece?.let { (startRow, startCol) ->
-                        if (boardState[row][col] == null && boardState[startRow][startCol]?.isUpperCase() == (playerColor == 'w')) {
+                        // Проверяем, пуста ли  или принадлежит ли фигура противнику
+                        val targetPiece = boardState[row][col]
+                        val isAttack = targetPiece != null && targetPiece.isUpperCase() != (playerColor == 'w')
+
+                        if (targetPiece == null || isAttack) {
                             makeMove(
-                                "${getChessNotation(startCol)}${8 - startRow}${
-                                    getChessNotation(
-                                        col
-                                    )
-                                }${8 - row}"
+                                "${getChessNotation(startCol)}${8 - startRow}${getChessNotation(col)}${8 - row}"
                             )
                             selectedPiece = null
+                        } else {
+                            Toast.makeText(
+                                this@MainActivity,
+                                "Невозможно выполнить ход на выбранную клетку",
+                                Toast.LENGTH_SHORT
+                            ).show()
                         }
                     }
                 }
