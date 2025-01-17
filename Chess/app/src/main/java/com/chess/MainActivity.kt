@@ -34,6 +34,7 @@ class MainActivity : AppCompatActivity() {
     private val turnTextView: TextView by lazy { findViewById(R.id.turnTextView) }
     private val playerColorTextView: TextView by lazy { findViewById(R.id.playerColor) }
     private val client = OkHttpClient.Builder().readTimeout(0, TimeUnit.MILLISECONDS).build()
+    private val gameStarted = false
 
     private var selectedPiece: Pair<Int, Int>? = null
     private var boardState: Array<Array<Char?>> = Array(8) { Array(8) { null } }
@@ -86,6 +87,12 @@ class MainActivity : AppCompatActivity() {
                 cellFrame.setOnClickListener {
                     val targetPiece = boardState[row][col]
 
+                    if (!gameStarted) {
+                        Toast.makeText(
+                            this@MainActivity, "Игра не начата", Toast.LENGTH_SHORT
+                        ).show()
+                        return@setOnClickListener
+                    }
                     if (selectedPiece != null) {
                         val (startRow, startCol) = selectedPiece!!
                         val isAttack = targetPiece != null && targetPiece.isUpperCase() != (playerColor == 'w')
