@@ -73,13 +73,10 @@ class MainActivity : AppCompatActivity() {
                     cellFrame.addView(imageView)
 
                     imageView.setOnClickListener {
-                        // Если текущий ход игрока
                         if (currentTurn == playerColor) {
                             if (piece.isUpperCase() == (playerColor == 'w')) {
-                                // Выбор своей фигуры
                                 selectedPiece = Pair(row, col)
                             } else {
-                                // Передаём управление обработчику FrameLayout для обработки съедания фигуры
                                 cellFrame.performClick()
                             }
                         }
@@ -91,19 +88,14 @@ class MainActivity : AppCompatActivity() {
 
                     if (selectedPiece != null) {
                         val (startRow, startCol) = selectedPiece!!
-
-                        // Проверяем, принадлежит ли цель противнику
-                        val isAttack =
-                            targetPiece != null && targetPiece.isUpperCase() != (playerColor == 'w')
+                        val isAttack = targetPiece != null && targetPiece.isUpperCase() != (playerColor == 'w')
 
                         if (targetPiece == null || isAttack) {
-                            // Выполняем ход
                             makeMove(
                                 "${getChessNotation(startCol)}${8 - startRow}${getChessNotation(col)}${8 - row}"
                             )
                             selectedPiece = null
                         } else {
-                            // Нельзя выполнить ход на выбранную клетку
                             Toast.makeText(
                                 this@MainActivity,
                                 "Невозможно выполнить ход на выбранную клетку",
@@ -111,19 +103,15 @@ class MainActivity : AppCompatActivity() {
                             ).show()
                         }
                     } else {
-                        // Если фигура не выбрана
                         if (targetPiece == null || targetPiece.isUpperCase() != (playerColor == 'w')) {
-                            // Чужая фигура или пустая клетка
                             Toast.makeText(
                                 this@MainActivity, "Это не ваша фигура!", Toast.LENGTH_SHORT
                             ).show()
                         } else {
-                            // Выбираем фигуру
                             selectedPiece = Pair(row, col)
                         }
                     }
                 }
-
             }
         }
 
@@ -162,16 +150,13 @@ class MainActivity : AppCompatActivity() {
 
                     streamBotGameState(currentGameId)
 
-                    // Проверяем цвет игрока через 3 секунды
                     lifecycleScope.launch {
                         delay(3000)
                         if (currentTurn != 'w') {
-                            // Если текущий ход — не белые, бот уже сделал ход
                             opponentFirst = true
                             playerColor = 'b'
                             playerColorTextView.text = "Ваш цвет: Черные"
                         } else {
-                            // Иначе игрок играет за белых
                             opponentFirst = false
                             playerColor = 'w'
                             playerColorTextView.text = "Ваш цвет: Белые"
@@ -222,7 +207,7 @@ class MainActivity : AppCompatActivity() {
             try {
                 val jsonObject = JSONObject(message)
                 if (jsonObject.getString("type") == "gameState") {
-                    val moves = jsonObject.getString("moves").split(" ") // Получаем список ходов
+                    val moves = jsonObject.getString("moves").split(" ")
                     val lastMove = moves.lastOrNull() ?: return
                     if (myFirstMove) {
                         opponentFirst = true
@@ -230,16 +215,12 @@ class MainActivity : AppCompatActivity() {
 
                     val (startCol, startRow, endCol, endRow) = parseMove(lastMove)
 
-                    // Проверяем состояние начальной клетки
                     if (boardState[startRow][startCol] != null) {
-                        // Выполняем ход
                         boardState[endRow][endCol] = boardState[startRow][startCol]
                         boardState[startRow][startCol] = null
 
-                        // Обновляем текущий ход
                         currentTurn = if (currentTurn == 'w') 'b' else 'w'
 
-                        // Обновляем доску через Flow
                         CoroutineScope(Dispatchers.Main).launch {
                             updateFlow.emit(boardState)
                         }
@@ -269,13 +250,11 @@ class MainActivity : AppCompatActivity() {
                             val movingPiece = boardState[startRow][startCol]
 
                             if (movingPiece != null) {
-                                // Обновляем состояние доски
                                 boardState[endRow][endCol] = movingPiece
                                 boardState[startRow][startCol] = null
 
                                 currentTurn = if (currentTurn == 'w') 'b' else 'w'
 
-                                // Обновляем доску через Flow
                                 updateFlow.emit(boardState)
                             }
                         } else {
@@ -316,13 +295,10 @@ class MainActivity : AppCompatActivity() {
                     cellFrame.addView(imageView)
 
                     imageView.setOnClickListener {
-                        // Если текущий ход игрока
                         if (currentTurn == playerColor) {
                             if (piece.isUpperCase() == (playerColor == 'w')) {
-                                // Выбор своей фигуры
                                 selectedPiece = Pair(row, col)
                             } else {
-                                // Передаём управление обработчику FrameLayout для обработки съедания фигуры
                                 cellFrame.performClick()
                             }
                         }
@@ -334,19 +310,14 @@ class MainActivity : AppCompatActivity() {
 
                     if (selectedPiece != null) {
                         val (startRow, startCol) = selectedPiece!!
-
-                        // Проверяем, принадлежит ли цель противнику
-                        val isAttack =
-                            targetPiece != null && targetPiece.isUpperCase() != (playerColor == 'w')
+                        val isAttack = targetPiece != null && targetPiece.isUpperCase() != (playerColor == 'w')
 
                         if (targetPiece == null || isAttack) {
-                            // Выполняем ход
                             makeMove(
                                 "${getChessNotation(startCol)}${8 - startRow}${getChessNotation(col)}${8 - row}"
                             )
                             selectedPiece = null
                         } else {
-                            // Нельзя выполнить ход на выбранную клетку
                             Toast.makeText(
                                 this@MainActivity,
                                 "Невозможно выполнить ход на выбранную клетку",
@@ -354,19 +325,15 @@ class MainActivity : AppCompatActivity() {
                             ).show()
                         }
                     } else {
-                        // Если фигура не выбрана
                         if (targetPiece == null || targetPiece.isUpperCase() != (playerColor == 'w')) {
-                            // Чужая фигура или пустая клетка
                             Toast.makeText(
                                 this@MainActivity, "Это не ваша фигура!", Toast.LENGTH_SHORT
                             ).show()
                         } else {
-                            // Выбираем фигуру
                             selectedPiece = Pair(row, col)
                         }
                     }
                 }
-
             }
         }
 
