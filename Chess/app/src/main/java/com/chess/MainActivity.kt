@@ -95,7 +95,8 @@ class MainActivity : AppCompatActivity() {
                     }
                     if (selectedPiece != null) {
                         val (startRow, startCol) = selectedPiece!!
-                        val isAttack = targetPiece != null && targetPiece.isUpperCase() != (playerColor == 'w')
+                        val isAttack =
+                            targetPiece != null && targetPiece.isUpperCase() != (playerColor == 'w')
 
                         if (targetPiece == null || isAttack) {
                             makeMove(
@@ -174,7 +175,8 @@ class MainActivity : AppCompatActivity() {
 
             } catch (e: HttpException) {
                 Log.d("MainActivity", "Error starting game: ${e.response()?.errorBody()?.string()}")
-                Toast.makeText(this@MainActivity, "Ошибка при старте игры", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this@MainActivity, "Ошибка при старте игры", Toast.LENGTH_SHORT)
+                    .show()
             }
         }
     }
@@ -212,6 +214,7 @@ class MainActivity : AppCompatActivity() {
     private fun handleGameStateUpdate(message: String) {
         if (message.isNotEmpty()) {
             try {
+                Log.d("MainActivity", "Game state update: $message")
                 val jsonObject = JSONObject(message)
                 if (jsonObject.getString("type") == "gameState") {
                     val moves = jsonObject.getString("moves").split(" ")
@@ -260,6 +263,7 @@ class MainActivity : AppCompatActivity() {
         CoroutineScope(Dispatchers.Main).launch {
             Toast.makeText(this@MainActivity, endMessage, Toast.LENGTH_LONG).show()
             turnTextView.text = "Игра завершена"
+            binding.startButton.visibility = View.VISIBLE
         }
 
         Log.d("MainActivity", "Game ended with status: $status")
@@ -297,9 +301,11 @@ class MainActivity : AppCompatActivity() {
                         }
                     }
                 } catch (e: Exception) {
-                    Toast.makeText(
-                        this@MainActivity, "Ход невозможен", Toast.LENGTH_SHORT
-                    ).show()
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(
+                            this@MainActivity, "Ход невозможен", Toast.LENGTH_SHORT
+                        ).show()
+                    }
                 }
             }
         }
@@ -345,7 +351,8 @@ class MainActivity : AppCompatActivity() {
 
                     if (selectedPiece != null) {
                         val (startRow, startCol) = selectedPiece!!
-                        val isAttack = targetPiece != null && targetPiece.isUpperCase() != (playerColor == 'w')
+                        val isAttack =
+                            targetPiece != null && targetPiece.isUpperCase() != (playerColor == 'w')
 
                         if (targetPiece == null || isAttack) {
                             makeMove(
@@ -430,5 +437,11 @@ class MainActivity : AppCompatActivity() {
         val endCol = move[2] - 'a'
         val endRow = 8 - move[3].toString().toInt()
         return MoveData(startCol, startRow, endCol, endRow)
+    }
+
+    suspend fun showToast(message: String) {
+        withContext(Dispatchers.Main) {
+            Toast.makeText(this@MainActivity, message, Toast.LENGTH_SHORT).show()
+        }
     }
 }
